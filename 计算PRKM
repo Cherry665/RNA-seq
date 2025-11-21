@@ -1,4 +1,4 @@
-#!R
+#!/bin/Rscript
 # 设置到rat目录
 setwd("~/project/rat")
 

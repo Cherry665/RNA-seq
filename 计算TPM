@@ -1,4 +1,4 @@
-#!R
+#!/bin/Rscript
 sum_ <- 0
 
 # 过滤掉统计行（以__开头的行）
@@ -15,3 +15,18 @@ for(i in valid_genes){
         sum_ = sum_ + value
     }
 }
+
+TPM <- c()
+for(i in row.names(count)){
+    count_ = 0
+    exon = 1
+    count_ = count[i, ]
+    exon  = gene_len[i, ]
+    tpm = (10 ^ 6 * count_ / exon ) / sum_
+    TPM = c(TPM, tpm)
+}
+
+count["RPKM"] <- RPKM
+count["TPM"] <- TPM       
+           
+write.table(count, "123.normalize.count", col.names = TRUE, row.names = TRUE, sep="\t", quote = FALSE)
