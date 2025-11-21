@@ -1,0 +1,17 @@
+#!R
+sum_ <- 0
+
+# 过滤掉统计行（以__开头的行）
+valid_genes <- row.names(count)[!grepl("^__", row.names(count))]
+
+for(i in valid_genes){
+    count_ = count[i, "count"]
+    exon  = gene_len[i, "length"]
+    value = count_ / exon
+    
+    if(is.na(value)){
+        print(paste(i, " is error! please check"))
+    }else{
+        sum_ = sum_ + value
+    }
+}

@@ -1,4 +1,5 @@
 #!R
+#参照流程中利用merge将表格合并成“merge.csv”的方法合并成“samples.count”
 rm(list=ls())
 setwd("~/project/rat/output/HTseq")
 
