@@ -1,0 +1,30 @@
+#!R
+rm(list=ls())
+setwd("~/project/rat/output/HTseq")
+
+# 得到文件样本编号
+files <- list.files(".", "*.count")
+f_lists <- list()
+for(i in files){
+    prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
+    f_lists[[prefix]] = i
+}
+
+id_list <- names(f_lists)
+data <- list()
+count <- 0
+for(i in id_list){
+  count <- count + 1
+  a <- read.table(f_lists[[i]], sep="\t", col.names = c("gene_id",i))
+  data[[count]] <- a
+}
+
+# 合并数据
+data_merge <- data[[1]]
+for(i in seq(2, length(id_list))){
+    data_merge <- merge(data_merge, data[[i]], by="gene_id")
+}
+
+# 保存为samples.count（制表符分隔，无行名列名）
+write.table(data_merge, "samples.count", sep="\t", 
+            quote=FALSE, row.names=FALSE, col.names=FALSE)
