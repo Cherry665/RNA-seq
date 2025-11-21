@@ -1,0 +1,26 @@
+#!R
+# 设置到rat目录
+setwd("~/project/rat")
+
+# 使用相对路径
+gene_len_file <- "annotation/rn6_gene_len.tsv"
+count_file <- "output/HTseq/samples.count"
+
+gene_len <- read.table(gene_len_file, header = FALSE, row.name = 1)
+colnames(gene_len) <- c("length")
+
+count <- read.table(count_file, header = FALSE, row.name = 1)
+colnames(count) <- c("count" )
+# all read number
+all_count <- sum(count["count"])
+
+RPKM <- c()
+for(i in row.names(count)){
+    count_ = 0
+    exon_kb = 1
+    rpkm = 0
+    count_ = count[i, ]
+    exon_kb  = gene_len[i, ] / 1000
+    rpkm    = (10 ^ 6 * count_ ) / (exon_kb * all_count )
+    RPKM = c(RPKM, rpkm)
+}
