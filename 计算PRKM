@@ -12,15 +12,12 @@ colnames(gene_len) <- c("length")
 count <- read.table(count_file, header = FALSE, row.name = 1)
 colnames(count) <- c("count" )
 # all read number
-all_count <- sum(count["count"])
+all_count <- sum(count$count)
 
-RPKM <- c()
-for(i in row.names(count)){
-    count_ = 0
-    exon_kb = 1
-    rpkm = 0
-    count_ = count[i, ]
-    exon_kb  = gene_len[i, ] / 1000
-    rpkm    = (10 ^ 6 * count_ ) / (exon_kb * all_count )
-    RPKM = c(RPKM, rpkm)
+RPKM <- numeric(nrow(count))
+
+for(i in 1:nrow(count)){
+    count_val <- count[i, "count"]
+    exon_kb <- gene_len[i, "length"] / 1000
+    RPKM[i] <- (10^6 * count_val) / (exon_kb * all_count)
 }

@@ -16,17 +16,15 @@ for(i in valid_genes){
     }
 }
 
-TPM <- c()
-for(i in row.names(count)){
-    count_ = 0
-    exon = 1
-    count_ = count[i, ]
-    exon  = gene_len[i, ]
-    tpm = (10 ^ 6 * count_ / exon ) / sum_
-    TPM = c(TPM, tpm)
+TPM <- numeric(nrow(count))
+
+for(i in 1:nrow(count)){
+    count_ = count[i, "count"]
+    exon = gene_len[i, "length"]
+    TPM[i] = (10 ^ 6 * count_ / exon) / sum_
 }
 
 count["RPKM"] <- RPKM
-count["TPM"] <- TPM       
+count["TPM"] <- TPM    
            
 write.table(count, "123.normalize.count", col.names = TRUE, row.names = TRUE, sep="\t", quote = FALSE)
