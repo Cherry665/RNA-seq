@@ -1,0 +1,22 @@
+#!/bin/Rscript
+# 安装与加载包
+#biocLite 安装方式已经被新的 BiocManager 取代，用 BiocManager 安装以下包
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# 设置中国镜像（可选，加速下载）
+options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+
+# 安装所需的Bioconductor包
+BiocManager::install("DESeq2")
+BiocManager::install("pheatmap")
+BiocManager::install("biomaRt")
+BiocManager::install("org.Rn.eg.db")
+BiocManager::install("clusterProfiler")
+
+# 加载包
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Rn.eg.db)
+library(clusterProfiler)
