@@ -1,0 +1,220 @@
+# 安装与加载包
+## biocLite 安装方式已经被新的 BiocManager 取代，用 BiocManager 安装以下包
+
+```R
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# 设置中国镜像（可选，加速下载）
+options(BioC_mirror = "https://mirrors.tuna.tsinghua.edu.cn/bioconductor")
+
+# 安装所需的Bioconductor包
+BiocManager::install("DESeq2")
+BiocManager::install("pheatmap")
+BiocManager::install("biomaRt")
+BiocManager::install("org.Rn.eg.db")
+BiocManager::install("clusterProfiler")
+
+# 加载包
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Rn.eg.db)
+library(clusterProfiler)
+```
+
+# 构建对象
+## 先 cd 到 HTseq 目录下，再用cat写入coldata信息（在bash中）
+
+```bash
+mkdir -p ./phenotype && cat <<EOF >./phenotype/phenotype.csv
+"ids","state","condition","treatment"
+"SRR2190795","Liver cirrhosis","DEN + AM095","treatment"
+"SRR2240182","Liver cirrhosis","DEN + AM095","treatment"
+"SRR2240183","Liver cirrhosis","DEN + AM063","treatment"
+"SRR2240184","Liver cirrhosis","DEN + AM063","treatment"
+"SRR2240185","Liver cirrhosis","DEN","treatment"
+"SRR2240186","Liver cirrhosis","DEN","treatment"
+"SRR2240187","Healthy control","PBS","control"
+"SRR2240228","Healthy control","PBS","control"
+EOF
+```
+```R
+# 刚才countdata已经得到
+countdata
+# 读取样本分组信息(注意，需要加上row.names = 1（将第一列作为行名）, header = TRUE（将第一行作为列名），将行列名需要看好)
+coldata <- read.table("./phenotype/phenotype.csv", row.names = 1, header = TRUE, sep = "," )
+# 确认一下行列名是否有（不是简单的数值）
+head(coldata)
+# 调整数据顺序
+countdata <- countdata[row.names(coldata)]
+# 构建dds对象（countdata: 基因表达计数矩阵；coldata: 样本元数据表；design= ~ treatment：检测treatment组别之间的基因表达差异）
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+# 查看dds
+dds
+```
+
+# 样本相关性
+## PCA分析：
+
+```R
+# 接续着上面的构建得到的dds对象
+# DEseq2包提供了相应的函数,rlog()将原始计数数据转换为近似正态分布的形式,blind = FALSE意味着转换过程会考虑实验组别(实验组还是对照组)
+vsdata <- rlog(dds, blind=FALSE)
+# 加载 ggplot2 包
+library(ggplot2)
+# intgroup 分组，对rlog转换后的数据绘制PCA图，设置Y轴显示范围为-10到10
+plotPCA(vsdata, intgroup="treatment") + ylim(-10, 10)
+```
+
+## sample-to-sample distances热图:
+
+```R
+# 颜色管理包（不是必须）
+library("RColorBrewer")
+# 得到数据对象中基因的计数的转化值
+gene_data_transform <- assay(vsdata)
+# 使用t()进行转置
+# 使用dist方法求样本之间的距离
+sampleDists <- dist(t(gene_data_transform))
+# 转化为矩阵用于后续pheatmap()方法的输入
+sampleDistMatrix <- as.matrix(sampleDists)
+# 将矩阵的名称进行修改(改成control还是treatment，以及处理方法，可选)
+rownames(sampleDistMatrix) <- paste(vsdata$treatment, vsdata$condition, vsdata$ids, sep="-")
+colnames(sampleDistMatrix) <- paste(vsdata$treatment, vsdata$condition, vsdata$ids, sep="-")
+# 设置色盘
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+# 绘制热图与聚类
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+# 差异基因
+
+```R
+# 改变样本组别顺序，确保control组作为参考基线
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("control","treatment"))
+# 基于统计学方法进行计算
+dds <- DESeq(dds)
+```
+计算前 dds 为：
+
+```
+class: DESeqDataSet
+dim: 2126 8
+metadata(1): version
+assays(1): counts
+rownames(2126): ENSRNOG00000000417 ENSRNOG00000001466 ...
+  ENSRNOG00000062283 ENSRNOG00000062298
+rowData names(0):
+colnames(8): SRR2190795 SRR2240182 ... SRR2240187 SRR2240228
+colData names(3): state condition treatment
+```
+
+计算后 dds 为：
+
+```
+class: DESeqDataSet
+dim: 2126 8
+metadata(1): version
+assays(4): counts mu H cooks
+rownames(2126): ENSRNOG00000000417 ENSRNOG00000001466 ...
+  ENSRNOG00000062283 ENSRNOG00000062298
+rowData names(22): baseMean baseVar ... deviance maxCooks
+colnames(8): SRR2190795 SRR2240182 ... SRR2240187 SRR2240228
+colData names(4): state condition treatment sizeFactor
+```
+
+```R
+# 查看实验组与对照组的对比结果,用FDR校正（控制假阳性），显著性水平设定为0.05,p值< 0.05的基因被认为是显著差异表达
+result <- results(dds, pAdjustMethod = "fdr", alpha = 0.05)
+head(result)
+```
+
+输出结果为：  
+log2FoldChange: 对数2倍变化值（表达量变化程度）  
+lfcSE: 标准误  
+stat: 统计量  
+pvalue: 原始p值  
+padj: 校正后的p值（FDR校正）  
+NA表示表达量过低  
+
+```
+log2 fold change (MLE): treatment treatment vs control
+Wald test p-value: treatment treatment vs control
+DataFrame with 6 rows and 6 columns
+                      baseMean log2FoldChange     lfcSE      stat      pvalue          padj
+                     <numeric>      <numeric> <numeric> <numeric>   <numeric>     <numeric>
+ENSRNOG00000000417  39.0226619       0.831417  0.495525  1.677851 9.33762e-02   0.419328251
+ENSRNOG00000001466  36.5680445       6.680844  1.498068  4.459640 8.20976e-06   0.000567472
+ENSRNOG00000001488 140.2788378       0.167424  0.285656  0.586104 5.57806e-01   0.861833683
+ENSRNOG00000001489   7.9843976      -0.272349  0.765014 -0.356005 7.21837e-01            NA
+ENSRNOG00000001490  13.1553628       0.202867  0.637203  0.318371 7.50203e-01   0.934650076
+ENSRNOG00000001492   0.0549575      -1.399522  4.080452 -0.342982 7.31612e-01            NA
+```
+
+```R
+# 将结果按照p-value从低到高进行排序
+result_order <- result[order(result$pvalue),]
+head(result_order)
+```
+
+输出结果为：
+
+```
+log2 fold change (MLE): treatment treatment vs control
+Wald test p-value: treatment treatment vs control
+DataFrame with 6 rows and 6 columns
+                     baseMean log2FoldChange     lfcSE      stat      pvalue         padj
+                    <numeric>      <numeric> <numeric> <numeric>   <numeric>      <numeric>
+ENSRNOG00000047945  262.01289        4.87797  0.604524   8.06911 7.08107e-16    6.86864e-13
+ENSRNOG00000012404  649.56801       -2.87136  0.409741  -7.00775 2.42189e-12    1.17462e-09
+ENSRNOG00000017619  782.63900        1.97375  0.286493   6.88934 5.60518e-12    1.81234e-09
+ENSRNOG00000016573  244.61949       -1.60263  0.234740  -6.82727 8.65477e-12    2.09878e-09
+ENSRNOG00000018237 1172.28706        5.75840  0.904979   6.36302 1.97831e-10    3.83792e-08
+ENSRNOG00000013925    9.11722       -4.14580  0.754085  -5.49779 3.84587e-08    5.51817e-06
+```
+
+```R
+# 总结基因上下调情况
+summary(result_order)
+```
+
+输出结果为：  
+有32个基因上调，34个基因下调（共66个显著表达基因），2个离群值（这些基因的Cook's距离过大，可能影响模型拟合，在计算p值时被排除）  
+1154个基因（54%）因低表达被过滤掉，过滤标准：平均表达量（mean count）< 9  
+
+```
+out of 2126 with nonzero total read count
+adjusted p-value < 0.05
+LFC > 0 (up)       : 32, 1.5%
+LFC < 0 (down)     : 34, 1.6%
+outliers [1]       : 2, 0.094%
+low counts [2]     : 1154, 54%
+(mean count < 9)
+[1] see 'cooksCutoff' argument of ?results
+[2] see 'independentFiltering' argument of ?results
+```
+
+```R
+# 查看显著的基因数量
+table(result_order$padj<0.05)
+```
+
+输出结果为：  
+66个基因显著表达，904个不显著  
+
+```
+FALSE  TRUE
+  904    66
+```
+
+```R
+# 保存数据
+# 新建文件夹（与当前工作目录同级）
+dir.create("../DESeq2")
+# 按照基因名排序保存
+write.csv(result, file="../DESeq2/results.csv", quote = F)
+```
