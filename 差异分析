@@ -1,5 +1,5 @@
-## 安装与加载包
-# biocLite 安装方式已经被新的 BiocManager 取代，用 BiocManager 安装以下包
+# 安装与加载包
+## biocLite 安装方式已经被新的 BiocManager 取代，用 BiocManager 安装以下包
 
 ```R
 if (!require("BiocManager", quietly = TRUE))
@@ -23,8 +23,8 @@ library(org.Rn.eg.db)
 library(clusterProfiler)
 ```
 
-## 构建对象
-# 先 cd 到 HTseq 目录下，再用cat写入coldata信息（在bash中）
+# 构建对象
+## 先 cd 到 HTseq 目录下，再用cat写入coldata信息（在bash中）
 
 ```bash
 mkdir -p ./phenotype && cat <<EOF >./phenotype/phenotype.csv
@@ -54,8 +54,8 @@ dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= 
 dds
 ```
 
-## 样本相关性
-# PCA分析：
+# 样本相关性
+## PCA分析：
 
 ```R
 # 接续着上面的构建得到的dds对象
@@ -67,7 +67,7 @@ library(ggplot2)
 plotPCA(vsdata, intgroup="treatment") + ylim(-10, 10)
 ```
 
-# sample-to-sample distances热图:
+## sample-to-sample distances热图:
 
 ```R
 # 颜色管理包（不是必须）
@@ -91,7 +91,7 @@ pheatmap(sampleDistMatrix,
          col=colors)
 ```
 
-## 差异基因
+# 差异基因
 
 ```R
 # 改变样本组别顺序，确保control组作为参考基线
