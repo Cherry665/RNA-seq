@@ -1,6 +1,7 @@
-#!/bin/Rscript
-# 安装与加载包
-#biocLite 安装方式已经被新的 BiocManager 取代，用 BiocManager 安装以下包
+## 安装与加载包
+# biocLite 安装方式已经被新的 BiocManager 取代，用 BiocManager 安装以下包
+
+```R
 if (!require("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
@@ -20,3 +21,108 @@ library(pheatmap)
 library(biomaRt)
 library(org.Rn.eg.db)
 library(clusterProfiler)
+```
+
+## 构建对象
+# 先 cd 到 HTseq 目录下，再用cat写入coldata信息（在bash中）
+
+```bash
+mkdir -p ./phenotype && cat <<EOF >./phenotype/phenotype.csv
+"ids","state","condition","treatment"
+"SRR2190795","Liver cirrhosis","DEN + AM095","treatment"
+"SRR2240182","Liver cirrhosis","DEN + AM095","treatment"
+"SRR2240183","Liver cirrhosis","DEN + AM063","treatment"
+"SRR2240184","Liver cirrhosis","DEN + AM063","treatment"
+"SRR2240185","Liver cirrhosis","DEN","treatment"
+"SRR2240186","Liver cirrhosis","DEN","treatment"
+"SRR2240187","Healthy control","PBS","control"
+"SRR2240228","Healthy control","PBS","control"
+EOF
+```
+```R
+# 刚才countdata已经得到
+countdata
+# 读取样本分组信息(注意，需要加上row.names = 1（将第一列作为行名）, header = TRUE（将第一行作为列名），将行列名需要看好)
+coldata <- read.table("./phenotype/phenotype.csv", row.names = 1, header = TRUE, sep = "," )
+# 确认一下行列名是否有（不是简单的数值）
+head(coldata)
+# 调整数据顺序
+countdata <- countdata[row.names(coldata)]
+# 构建dds对象（countdata: 基因表达计数矩阵；coldata: 样本元数据表；design= ~ treatment：检测treatment组别之间的基因表达差异）
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+# 查看dds
+dds
+```
+
+## 样本相关性
+# PCA分析：
+
+```R
+# 接续着上面的构建得到的dds对象
+# DEseq2包提供了相应的函数,rlog()将原始计数数据转换为近似正态分布的形式,blind = FALSE意味着转换过程会考虑实验组别(实验组还是对照组)
+vsdata <- rlog(dds, blind=FALSE)
+# 加载 ggplot2 包
+library(ggplot2)
+# intgroup 分组，对rlog转换后的数据绘制PCA图，设置Y轴显示范围为-10到10
+plotPCA(vsdata, intgroup="treatment") + ylim(-10, 10)
+```
+
+# sample-to-sample distances热图:
+
+```R
+# 颜色管理包（不是必须）
+library("RColorBrewer")
+# 得到数据对象中基因的计数的转化值
+gene_data_transform <- assay(vsdata)
+# 使用t()进行转置
+# 使用dist方法求样本之间的距离
+sampleDists <- dist(t(gene_data_transform))
+# 转化为矩阵用于后续pheatmap()方法的输入
+sampleDistMatrix <- as.matrix(sampleDists)
+# 将矩阵的名称进行修改(改成control还是treatment，以及处理方法，可选)
+rownames(sampleDistMatrix) <- paste(vsdata$treatment, vsdata$condition, vsdata$ids, sep="-")
+colnames(sampleDistMatrix) <- paste(vsdata$treatment, vsdata$condition, vsdata$ids, sep="-")
+# 设置色盘
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+# 绘制热图与聚类
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+## 差异基因
+
+```R
+# 改变样本组别顺序，确保control组作为参考基线
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("control","treatment"))
+# 基于统计学方法进行计算
+dds <- DESeq(dds)
+```
+计算前 dds 为：
+
+```
+class: DESeqDataSet
+dim: 2126 8
+metadata(1): version
+assays(1): counts
+rownames(2126): ENSRNOG00000000417 ENSRNOG00000001466 ...
+  ENSRNOG00000062283 ENSRNOG00000062298
+rowData names(0):
+colnames(8): SRR2190795 SRR2240182 ... SRR2240187 SRR2240228
+colData names(3): state condition treatment
+```
+
+计算后 dds 为：
+
+```
+class: DESeqDataSet
+dim: 2126 8
+metadata(1): version
+assays(4): counts mu H cooks
+rownames(2126): ENSRNOG00000000417 ENSRNOG00000001466 ...
+  ENSRNOG00000062283 ENSRNOG00000062298
+rowData names(22): baseMean baseVar ... deviance maxCooks
+colnames(8): SRR2190795 SRR2240182 ... SRR2240187 SRR2240228
+colData names(4): state condition treatment sizeFactor
+```
